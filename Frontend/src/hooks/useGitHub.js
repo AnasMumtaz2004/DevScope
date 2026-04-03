@@ -6,37 +6,22 @@ function ghFetch(url) {
   const headers = TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}
   return fetch(url, { headers })
 }
-async function fetchContributionGraph(username) {
-  const res = await fetch('https://api.github.com/graphql', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      query: `
-        query($login: String!) {
-          user(login: $login) {
-            contributionsCollection {
-              contributionCalendar {
-                weeks {
-                  contributionDays {
-                    date
-                    contributionCount
-                  }
-                }
-              }
-            }
-          }
-        }
-      `,
-      variables: { login: username },
-    }),
-  })
 
-  const json = await res.json()
-  return json.data.user.contributionsCollection.contributionCalendar
+async function fetchContributionGraph(username) {
+  const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
+  const res = await fetch(`${BASE_URL}/api/contributions/${username}`)
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Failed to fetch contribution graph')
+  }
+
+  
+  return res.json()
 }
+
+
 
 export function useGitHub(username) {
   const [data, setData] = useState(null)
@@ -71,15 +56,15 @@ export function useGitHub(username) {
         const repos  = await reposRes.json()
         const events = await eventsRes.json()
 
-        console.log("EVENTS:", events) // ✅ debug (optional)
+        console.log("EVENTS:", events)
 
         setData({
           user,
-          stats: buildStats(user, repos),
-          langs: buildLanguages(repos),
+          stats:    buildStats(user, repos),
+          langs:    buildLanguages(repos),
           topRepos: buildTopRepos(repos),
-          commits: buildRecentActivity(events), // 🔥 fixed
-          heatmap: buildHeatmapFromGraphQL(calendar),
+          commits:  buildRecentActivity(events),
+          heatmap:  buildHeatmapFromGraphQL(calendar),
         })
 
       } catch (err) {
@@ -95,7 +80,6 @@ export function useGitHub(username) {
   return { data, loading, error }
 }
 
-// 🔥 Heatmap builder
 function buildHeatmapFromGraphQL(calendar) {
   const days = []
 
@@ -104,13 +88,13 @@ function buildHeatmapFromGraphQL(calendar) {
       const n = day.contributionCount
 
       let level = 0
-      if (n >= 1) level = 1
-      if (n >= 3) level = 2
-      if (n >= 6) level = 3
+      if (n >= 1)  level = 1
+      if (n >= 3)  level = 2
+      if (n >= 6)  level = 3
       if (n >= 10) level = 4
 
       days.push({
-        key: day.date,
+        key:   day.date,
         count: n,
         level,
       })
@@ -120,25 +104,23 @@ function buildHeatmapFromGraphQL(calendar) {
   return days.slice(-182)
 }
 
-// 🔥 FIXED: Always shows activity
 function buildRecentActivity(events) {
   return events
     .map(e => ({
       message: e.type.replace('Event', ''),
-      repo: e.repo?.name?.split('/')[1] || 'unknown',
-      date: e.created_at,
-      url: `https://github.com/${e.repo?.name || ''}`,
+      repo:    e.repo?.name?.split('/')[1] || 'unknown',
+      date:    e.created_at,
+      url:     `https://github.com/${e.repo?.name || ''}`,
     }))
     .slice(0, 6)
 }
 
-// stats 
 function buildStats(user, repos) {
   return {
-    commits: '—',
-    repos: user.public_repos,
+    commits:   '—',
+    repos:     user.public_repos,
     followers: user.followers,
-    streak: '—',
+    streak:    '—',
   }
 }
 
@@ -168,10 +150,10 @@ function buildTopRepos(repos) {
     .sort((a, b) => b.stargazers_count - a.stargazers_count)
     .slice(0, 4)
     .map(r => ({
-      name: r.name,
-      desc: r.description || 'No description',
+      name:  r.name,
+      desc:  r.description || 'No description',
       stars: r.stargazers_count,
-      url: r.html_url,
-      lang: r.language,
+      url:   r.html_url,
+      lang:  r.language,
     }))
 }
