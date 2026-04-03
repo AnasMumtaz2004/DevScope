@@ -36,7 +36,7 @@ export function useGitHub(username) {
 
                 setData({
                     user,
-                    stats:    buildStats(user, repos),
+                    stats:    buildStats(user, repos, events),
                     langs:    buildLanguages(repos),
                     topRepos: buildTopRepos(repos),
                     commits:  buildRecentActivity(events),
@@ -74,18 +74,25 @@ function buildHeatmapFromGraphQL(calendar) {
 
 function buildRecentActivity(events) {
     return events
-        .map(e => ({
-            message: e.type.replace('Event', ''),
-            repo:    e.repo?.name?.split('/')[1] || 'unknown',
-            date:    e.created_at,
-            url:     `https://github.com/${e.repo?.name || ''}`,
-        }))
+        .filter(e => e.type === 'PushEvent')
+        .flatMap(e =>
+            (e.payload?.commits || []).map(commit => ({
+                message: commit.message,
+                repo:    e.repo?.name?.split('/')[1] || 'unknown',
+                date:    e.created_at,
+                url:     `https://github.com/${e.repo?.name || ''}`,
+            }))
+        )
         .slice(0, 6)
 }
 
-function buildStats(user, repos) {
+function buildStats(user, repos, events) {
+    const commitCount = events
+        .filter(e => e.type === 'PushEvent')
+        .reduce((acc, e) => acc + (e.payload?.commits?.length || 0), 0)
+
     return {
-        commits:   '—',
+        commits:   commitCount,
         repos:     user.public_repos,
         followers: user.followers,
         streak:    '—',
