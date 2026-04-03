@@ -2,16 +2,46 @@ import { useState, useEffect } from 'react'
 
 const TOKEN = import.meta.env.VITE_GITHUB_TOKEN
 
-
 function ghFetch(url) {
   const headers = TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}
   return fetch(url, { headers })
 }
+async function fetchContributionGraph(username) {
+  const res = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: `
+        query($login: String!) {
+          user(login: $login) {
+            contributionsCollection {
+              contributionCalendar {
+                weeks {
+                  contributionDays {
+                    date
+                    contributionCount
+                  }
+                }
+              }
+            }
+          }
+        }
+      `,
+      variables: { login: username },
+    }),
+  })
+
+  const json = await res.json()
+  return json.data.user.contributionsCollection.contributionCalendar
+}
 
 export function useGitHub(username) {
-  const [data, setData]       = useState(null)
+  const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState(null)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!username) return
@@ -22,11 +52,11 @@ export function useGitHub(username) {
       setData(null)
 
       try {
-        // fetch data
-        const [userRes, reposRes, eventsRes] = await Promise.all([
+        const [userRes, reposRes, calendar, eventsRes] = await Promise.all([
           ghFetch(`https://api.github.com/users/${username}`),
           ghFetch(`https://api.github.com/users/${username}/repos?per_page=100&sort=pushed`),
-          ghFetch(`https://api.github.com/users/${username}/events/public?per_page=100`),
+          fetchContributionGraph(username),
+          ghFetch(`https://api.github.com/users/${username}/events/public?per_page=100`)
         ])
 
         if (!userRes.ok) {
@@ -41,13 +71,15 @@ export function useGitHub(username) {
         const repos  = await reposRes.json()
         const events = await eventsRes.json()
 
+        console.log("EVENTS:", events) // ✅ debug (optional)
+
         setData({
           user,
-          stats:    buildStats(user, repos, events),
-          langs:    buildLanguages(repos),
+          stats: buildStats(user, repos),
+          langs: buildLanguages(repos),
           topRepos: buildTopRepos(repos),
-          commits:  buildRecentCommits(events),
-          heatmap:  buildHeatmap(events),
+          commits: buildRecentActivity(events), // 🔥 fixed
+          heatmap: buildHeatmapFromGraphQL(calendar),
         })
 
       } catch (err) {
@@ -63,36 +95,53 @@ export function useGitHub(username) {
   return { data, loading, error }
 }
 
-// build basic stats
-function buildStats(user, repos, events) {
-  const totalCommits = events
-    .filter(e => e.type === 'PushEvent')
-    .reduce((sum, e) => sum + (e.payload.commits?.length || 0), 0)
+// 🔥 Heatmap builder
+function buildHeatmapFromGraphQL(calendar) {
+  const days = []
 
-  const pushDays = new Set(
-    events
-      .filter(e => e.type === 'PushEvent')
-      .map(e => e.created_at.slice(0, 10))
-  )
+  calendar.weeks.forEach(week => {
+    week.contributionDays.forEach(day => {
+      const n = day.contributionCount
 
-  let streak = 0
-  const day = new Date()
-  while (true) {
-    const key = day.toISOString().slice(0, 10)
-    if (!pushDays.has(key)) break
-    streak++
-    day.setDate(day.getDate() - 1)
-  }
+      let level = 0
+      if (n >= 1) level = 1
+      if (n >= 3) level = 2
+      if (n >= 6) level = 3
+      if (n >= 10) level = 4
 
+      days.push({
+        key: day.date,
+        count: n,
+        level,
+      })
+    })
+  })
+
+  return days.slice(-182)
+}
+
+// 🔥 FIXED: Always shows activity
+function buildRecentActivity(events) {
+  return events
+    .map(e => ({
+      message: e.type.replace('Event', ''),
+      repo: e.repo?.name?.split('/')[1] || 'unknown',
+      date: e.created_at,
+      url: `https://github.com/${e.repo?.name || ''}`,
+    }))
+    .slice(0, 6)
+}
+
+// stats 
+function buildStats(user, repos) {
   return {
-    commits:   totalCommits,
-    repos:     user.public_repos,
+    commits: '—',
+    repos: user.public_repos,
     followers: user.followers,
-    streak,
+    streak: '—',
   }
 }
 
-// top languages 
 function buildLanguages(repos) {
   const counts = {}
 
@@ -113,65 +162,16 @@ function buildLanguages(repos) {
     .slice(0, 5)
 }
 
-// top starred repos 
 function buildTopRepos(repos) {
   return repos
     .filter(r => !r.fork)
     .sort((a, b) => b.stargazers_count - a.stargazers_count)
     .slice(0, 4)
     .map(r => ({
-      name:  r.name,
-      desc:  r.description || 'No description',
+      name: r.name,
+      desc: r.description || 'No description',
       stars: r.stargazers_count,
-      url:   r.html_url,
-      lang:  r.language,
+      url: r.html_url,
+      lang: r.language,
     }))
-}
-
-// recent commits 
-function buildRecentCommits(events) {
-  return events
-    .filter(e => e.type === 'PushEvent')
-    .flatMap(e =>
-      (e.payload.commits || []).map(c => ({
-        message: c.message.split('\n')[0],
-        repo:    e.repo.name.split('/')[1],
-        date:    e.created_at,
-        url:     `https://github.com/${e.repo.name}`,
-      }))
-    )
-    .slice(0, 6)
-}
-
-// contribution heatmap 
-function buildHeatmap(events) {
-  const countByDay = {}
-
-  events
-    .filter(e => e.type === 'PushEvent')
-    .forEach(e => {
-      const day = e.created_at.slice(0, 10)
-      const n   = e.payload.commits?.length || 0
-      countByDay[day] = (countByDay[day] || 0) + n
-    })
-
-  const days  = []
-  const today = new Date()
-
-  for (let i = 181; i >= 0; i--) {
-    const d   = new Date(today)
-    d.setDate(today.getDate() - i)
-    const key = d.toISOString().slice(0, 10)
-    const n   = countByDay[key] || 0
-
-    let level = 0
-    if (n >= 1)  level = 1
-    if (n >= 3)  level = 2
-    if (n >= 6)  level = 3
-    if (n >= 10) level = 4
-
-    days.push({ key, level, count: n })
-  }
-
-  return days
 }

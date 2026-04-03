@@ -42,8 +42,7 @@ const App = () => {
                 viewBox="0 0 64 64"
                 fill="none"
                 className="w-5 h-5 mt-px"
-             >
-                {/* Outer D shape */}
+              >
                 <path
                   d="M16 8 H32 A20 20 0 0 1 32 56 H16 Z"
                   stroke="#216e39"
@@ -51,20 +50,15 @@ const App = () => {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-
-                {/* Nodes */}
                 <circle cx="20" cy="16" r="3.8" fill="#216e39" />
                 <circle cx="44" cy="32" r="3.8" fill="#216e39" />
                 <circle cx="20" cy="48" r="3.8" fill="#216e39" />
-
-                {/* Branch lines */}
                 <path
                   d="M20 16 V48"
                   stroke="#216e39"
                   strokeWidth="4.5"
                   strokeLinecap="round"
                 />
-
                 <path
                   d="M20 32 C20 32, 32 32, 44 32"
                   stroke="#216e39"
@@ -203,7 +197,8 @@ const App = () => {
                 <p className="text-xs text-zinc-400 dark:text-zinc-600 mb-3 tracking-wide">
                   Contribution activity — last 6 months
                 </p>
-                <HeatMap days={data.heatmap} />
+                {/* pass dark so HeatMap re-renders on toggle */}
+                <HeatMap days={data.heatmap} dark={dark} />
               </div>
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4">
                 <p className="text-xs text-zinc-400 dark:text-zinc-600 mb-3 tracking-wide">
@@ -252,27 +247,33 @@ const App = () => {
                 <p className="text-xs text-zinc-400 dark:text-zinc-600 mb-3 tracking-wide">
                   Recent commits
                 </p>
-                <div className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-800">
-                  {data.commits.map((c, i) => (
-                    <a
-                      key={i}
-                      href={c.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-start gap-2.5 py-2.5 hover:opacity-70 transition-opacity"
-                    >
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#9be9a8] mt-1.5 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-snug line-clamp-1">
-                          {c.message}
-                        </p>
-                        <p className="text-xs text-zinc-400 dark:text-zinc-600 mt-0.5">
-                          {new Date(c.date).toLocaleDateString()} · {c.repo}
-                        </p>
-                      </div>
-                    </a>
-                  ))}
-                </div>
+                {data.commits.length === 0 ? (
+                  <p className="text-xs text-zinc-400 dark:text-zinc-600">
+                    No recent commits found in last 100 events
+                  </p>
+                ) : (
+                  <div className="flex flex-col divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {data.commits.map((c, i) => (
+                      <a
+                        key={i}
+                        href={c.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-start gap-2.5 py-2.5 hover:opacity-70 transition-opacity"
+                      >
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#9be9a8] mt-1.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-snug line-clamp-1">
+                            {c.message}
+                          </p>
+                          <p className="text-xs text-zinc-400 dark:text-zinc-600 mt-0.5">
+                            {new Date(c.date).toLocaleDateString()} · {c.repo}
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
 
             </div>
