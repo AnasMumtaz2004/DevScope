@@ -10,7 +10,6 @@ export const StatCardSkeleton = () => {
   )
 }
 
-// ✅ FIXED — { label, value, sub } props added
 const StatCard = ({ label, value, sub }) => {
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">

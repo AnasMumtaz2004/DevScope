@@ -195,7 +195,7 @@ const App = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-4">
                 <p className="text-xs text-zinc-400 dark:text-zinc-600 mb-3 tracking-wide">
-                  Contribution activity — last 6 months
+                  Contribution activity — last year
                 </p>
                 {/* pass dark so HeatMap re-renders on toggle */}
                 <HeatMap days={data.heatmap} dark={dark} />
@@ -234,7 +234,7 @@ const App = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-1 text-xs text-[#216e39] shrink-0">
-                        <span>★</span>
+                        <span>{'\u2605'}</span>
                         <span>{repo.stars}</span>
                       </div>
                     </a>
