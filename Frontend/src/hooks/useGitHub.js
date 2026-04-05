@@ -111,7 +111,6 @@ function buildRecentActivity(events) {
     .slice(0, 6)
 }
 
-// ✅ helper for total commits (unchanged logic)
 function getTotalCommitsFromCalendar(calendar) {
   return calendar.weeks.reduce((sum, week) => {
     return sum + week.contributionDays.reduce((wSum, day) => {
@@ -120,9 +119,9 @@ function getTotalCommitsFromCalendar(calendar) {
   }, 0)
 }
 
-// ✅ NEW: local date fix (IMPORTANT)
+
 function getLocalDateString(date) {
-  return date.toLocaleDateString('en-CA') // YYYY-MM-DD
+  return date.toLocaleDateString('en-CA') 
 }
 
 
@@ -140,7 +139,7 @@ function buildStats(user, repos, events, calendar) {
   const current = new Date()
 
   while (true) {
-    const key = getLocalDateString(current) // ✅ FIX HERE
+    const key = getLocalDateString(current) 
     if (!pushDays.has(key)) break
     streak++
     current.setDate(current.getDate() - 1)
