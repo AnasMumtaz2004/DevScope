@@ -1,77 +1,106 @@
 # DevScope
 
-A GitHub profile analytics dashboard built with React. Search any public GitHub username and get a live breakdown of their activity, repos, language usage, and contribution history. No backend, no database. Just the GitHub REST API called directly from the browser.
+A GitHub profile analytics dashboard. Type any public GitHub username and it pulls real data from the GitHub API — no login, no account needed.
 
-I built this because I wanted a single place to quickly profile any GitHub user without clicking through their profile page. Everything is derived from public data so it works on any account without any login or OAuth flow.
+Built with React, Tailwind CSS, and a small Express backend that keeps the GitHub token off the browser.
 
----
+Live at https://dev-scope-two.vercel.app
 
-## What it does
 
-- Fetches user profile, public repos, and the last 100 public events from the GitHub API in parallel
-- Displays commit count, repo count, follower count, and current push streak as stat cards
-- Renders a 6-month contribution heatmap with hover tooltips showing exact commit count per day
-- Lists top repositories sorted by star count, forks excluded
-- Shows recent commit messages with repo name, date, and a direct link to the repo
-- Breaks down the top 5 languages across repos with percentage bars
-- Full skeleton loading UI while data is in flight so the layout never jumps
-- Light and dark mode toggle, dark class applied on the html element, Tailwind handles the rest
+## What it shows
 
----
+The contribution heatmap is the main thing. It uses GitHub's GraphQL API to pull your full contribution calendar — the same data GitHub shows on your profile, with the same four shades of green. Every square is a real day, every shade is a real commit count.
+
+Below that: top repositories sorted by stars, recent commit messages linked directly to each repo, a language breakdown built from your actual repos, and four stat cards showing recent commits, public repos, followers, and current push streak. None of it is cached — every search hits the API fresh.
+
 
 ## Tech stack
 
-- React 18 with hooks
-- Tailwind CSS v4
-- Vite
-- GitHub REST API v3
-- Silkscreen font for the wordmark
+Frontend is React 19 with Tailwind CSS v4, built with Vite 7. No component library, no UI kit — everything is written from scratch. The contribution heatmap, skeleton loaders, tooltip on hover, dark mode toggle, and responsive layout are all hand-rolled.
 
----
+Backend is a small Express server with one real route: POST /api/contributions/:username. It takes the username, calls GitHub's GraphQL API using a server-side token, and returns the contribution calendar. The token never touches the browser.
 
-## Getting started
 
-Requires Node.js 18 or above.
 
-```
-git clone https://github.com/your-username/devscope
-cd devscope
-npm install
-npm run dev
-```
 
-Open http://localhost:5173 and search any GitHub username.
+    DEVSCOPE/
+    Backend/
+        server.js
+        package.json
+        .env
+        .gitignore
+    Frontend/
+        src/
+            components/
+                HeatMap.jsx
+                LanguageBar.jsx
+                StatCard.jsx
+                Skeleton.jsx
+            hooks/
+                useGitHub.js
+            App.jsx
+            index.css
+            main.jsx
+        index.html
+        vite.config.js
+        package.json
+        .env
+        .gitignore
 
----
 
-## GitHub token setup
+## Running it locally
 
-The app works out of the box without any configuration. Unauthenticated GitHub API requests are limited to 60 per hour per IP. If you are testing heavily you will hit that fast.
+You need Node 20.19 or higher. Check with node -v before starting.
 
-Create a .env file in the project root:
+Get a GitHub personal access token at github.com/settings/tokens. Use a classic token with no scopes — just generate it with all checkboxes unticked. This is what the backend uses to call the GraphQL API.
 
-```
-VITE_GITHUB_TOKEN=your_personal_access_token
-```
+Open Backend/.env and replace your_github_token_here with the token you just copied.
 
----
+Then in two separate terminals:
 
-## Deployment
+Terminal one, for the backend:
 
-It is a fully static site. Run npm run dev locally or deploy the dist folder to Vercel, Netlify, or GitHub Pages. No server needed.
+    cd Backend
+    npm install
+    npm run dev
 
-If you are deploying and want the token out of your codebase, set VITE_GITHUB_TOKEN as an environment variable in your hosting provider's dashboard instead of committing the .env file.
+Terminal two, for the frontend:
 
----
+    cd Frontend
+    npm install
+    npm run dev
 
-## Known limitations
+Open http://localhost:5173 and search any GitHub username. AnasMumtaz2004 is a good one to start with.
 
-The GitHub public events API only returns the last 100 events regardless of pagination. The commit count and heatmap reflect recent activity only, not the full account history. GitHub does not expose a total commit count through the REST API without iterating every repo individually which is too many requests for a client-side app.
 
-The streak counter only tracks push events. It resets if there is no push on a given day even if the user made contributions through pull requests or reviews. This is intentional to keep it consistent with what the heatmap shows.
+## Deploying
 
----
+Backend goes on Render. Push the Backend folder to a GitHub repo, create a new Web Service on Render, set the build command to npm install and the start command to npm start. Add two environment variables in Render's dashboard: GITHUB_TOKEN with your token, and CLIENT_URL with your Vercel frontend URL once you have it.
+
+Frontend goes on Vercel. Push the Frontend folder to a separate GitHub repo, connect it to Vercel, and it will detect Vite automatically. Add one environment variable: VITE_API_URL set to your Render backend URL, for example https://devscope-api.onrender.com.
+
+After both are deployed, update CLIENT_URL in Render to match your actual Vercel URL. That is the CORS setting — if it is wrong, the browser will block requests from the frontend to the backend.
+
+
+## Environment variables
+
+Backend/.env
+
+    GITHUB_TOKEN : your GitHub personal access token
+    CLIENT_URL : the frontend URL allowed to talk to this server
+
+Frontend/.env
+
+    VITE_API_URL      the backend server URL
+
+## A note on the data
+
+Recent commits and current streak are calculated from the last 100 public events the GitHub API returns. This means the numbers reflect recent activity, not a full career total. The contribution heatmap comes from GraphQL and covers the full past year — that data is accurate.
+
+If a user has no push events in their last 100 public events, commits will show 0 and streak will show 0. That is expected — the events API only goes back so far.
+
 
 ## Author
 
 Anas Mumtaz
+github.com/AnasMumtaz2004
