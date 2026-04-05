@@ -20,7 +20,6 @@ async function fetchContributionGraph(username) {
   return res.json()
 }
 
-
 export function useGitHub(username) {
   const [data, setData]= useState(null)
   const [loading, setLoading] = useState(false)
@@ -40,6 +39,7 @@ export function useGitHub(username) {
           fetchContributionGraph(username),
           ghFetch(`https://api.github.com/users/${username}/events/public?per_page=100`)
         ])
+
         if (!userRes.ok) {
           throw new Error(
             userRes.status === 404
@@ -56,11 +56,11 @@ export function useGitHub(username) {
 
         setData({
           user,
-          stats:buildStats(user, repos, events),
-          langs:buildLanguages(repos),
-          topRepos:buildTopRepos(repos),
-          commits:buildRecentActivity(events),
-          heatmap:buildHeatmapFromGraphQL(calendar),
+          stats: buildStats(user, repos, events, calendar),
+          langs: buildLanguages(repos),
+          topRepos: buildTopRepos(repos),
+          commits: buildRecentActivity(events),
+          heatmap: buildHeatmapFromGraphQL(calendar),
         })
 
       } catch (err) {
@@ -90,8 +90,8 @@ function buildHeatmapFromGraphQL(calendar) {
       if (n >= 10) level = 4
 
       days.push({
-        key:day.date,
-        count:n,
+        key: day.date,
+        count: n,
         level,
       })
     })
@@ -104,34 +104,51 @@ function buildRecentActivity(events) {
   return events
     .map(e => ({
       message: e.type.replace('Event', ''),
-      repo:e.repo?.name?.split('/')[1] || 'unknown',
-      date:e.created_at,
+      repo: e.repo?.name?.split('/')[1] || 'unknown',
+      date: e.created_at,
       url: `https://github.com/${e.repo?.name || ''}`,
     }))
     .slice(0, 6)
 }
 
-function buildStats(user, repos, events) {
-  const totalCommits = events
-    .filter(e => e.type === 'PushEvent')
-    .reduce((sum, e) => sum + (e.payload.commits?.length || 0), 0)
+// ✅ helper for total commits (unchanged logic)
+function getTotalCommitsFromCalendar(calendar) {
+  return calendar.weeks.reduce((sum, week) => {
+    return sum + week.contributionDays.reduce((wSum, day) => {
+      return wSum + day.contributionCount
+    }, 0)
+  }, 0)
+}
+
+// ✅ NEW: local date fix (IMPORTANT)
+function getLocalDateString(date) {
+  return date.toLocaleDateString('en-CA') // YYYY-MM-DD
+}
+
+
+function buildStats(user, repos, events, calendar) {
+  const totalCommits = getTotalCommitsFromCalendar(calendar)
   const pushDays = new Set(
-    events
-      .filter(e => e.type === 'PushEvent')
-      .map(e => e.created_at.slice(0, 10)) 
+    calendar.weeks.flatMap(week =>
+      week.contributionDays
+        .filter(day => day.contributionCount > 0)
+        .map(day => day.date)
+    )
   )
 
-  let streak    = 0
+  let streak = 0
   const current = new Date()
+
   while (true) {
-    const key = current.toISOString().slice(0, 10)
+    const key = getLocalDateString(current) // ✅ FIX HERE
     if (!pushDays.has(key)) break
     streak++
     current.setDate(current.getDate() - 1)
   }
+
   return {
-    commits:   totalCommits,
-    repos:     user.public_repos,
+    commits: totalCommits,
+    repos: user.public_repos,
     followers: user.followers,
     streak,
   }
@@ -162,10 +179,10 @@ function buildTopRepos(repos) {
     .sort((a, b) => b.stargazers_count - a.stargazers_count)
     .slice(0, 4)
     .map(r => ({
-      name:r.name,
-      desc:r.description || 'No description',
-      stars:r.stargazers_count,
-      url:r.html_url,
-      lang:r.language,
+      name: r.name,
+      desc: r.description || 'No description',
+      stars: r.stargazers_count,
+      url: r.html_url,
+      lang: r.language,
     }))
 }
